@@ -1,0 +1,24 @@
+{
+  "name": "rezerv-konfigurator",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Конфігуратор резервного живлення: схема щита, кошторис, список покупок і PDF-фотозвіт",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:artifact": "vite build --mode artifact",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "html2canvas": "1.4.1",
+    "jspdf": "2.5.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "4.3.4",
+    "vite": "5.4.11",
+    "vite-plugin-singlefile": "2.0.3"
+  }
+}
