@@ -1,5 +1,5 @@
 import { esc, fmt, dec } from "./utils.js";
-import { worksDone } from "./compute.js";
+import { worksDone, workPrice } from "./compute.js";
 
 /* PDF-фотозвіт: HTML-сторінки рендеряться поза екраном (html2canvas) і складаються в A4 (jsPDF).
    Кирилиця йде через браузерні шрифти, тому вбудовувати шрифт у PDF не потрібно. */
@@ -58,13 +58,14 @@ function reportSection({ s, calc, cat, png, parts, zones }) {
       h += `<tr class="z" data-blk><td colspan="4">${zones[z]}</td><td class="n">${fmt(rows.reduce((a, b) => a + b.sum, 0))}</td></tr>`;
       rows.forEach((it) => {
         i++;
-        const extra = it.zone === "works" ? (r.usd ? ` <span style="color:#5b6876">(${fmt(r.usd)} $)</span>` : "") : it.c.model ? ` <span style="color:#5b6876">(${esc(it.c.model)})</span>` : "";
-        h += `<tr data-blk><td>${i}</td><td>${esc(it.c.name)}${extra}</td><td class="n">${it.qty} ${esc(it.c.unit)}</td><td class="n">${fmt(it.c.price)}</td><td class="n">${fmt(it.sum)}</td></tr>`;
+        const wp = workPrice(it, r);
+        const extra = it.zone !== "works" && it.c.model ? ` <span style="color:#5b6876">(${esc(it.c.model)})</span>` : "";
+        h += `<tr data-blk><td>${i}</td><td>${esc(it.c.name)}${extra}</td><td class="n">${it.qty} ${esc(it.c.unit)}</td><td class="n">${wp || fmt(it.c.price)}</td><td class="n">${wp || fmt(it.sum)}</td></tr>`;
       });
     });
-    h += `<tr class="t" data-blk><td></td><td>Матеріали</td><td></td><td></td><td class="n">${fmt(r.mat)}</td></tr>`;
-    h += `<tr class="t" data-blk><td></td><td>Монтаж${r.usd ? ` (${fmt(r.usd)} $)` : ""}</td><td></td><td></td><td class="n">${fmt(r.works)}</td></tr>`;
-    h += `<tr class="t" data-blk><td></td><td>Разом, грн</td><td></td><td></td><td class="n">${fmt(r.total)}</td></tr></tbody></table>`;
+    h += `<tr class="t" data-blk><td></td><td>Матеріали</td><td></td><td></td><td class="n">${fmt(r.mat)} грн</td></tr>`;
+    if (r.wLabel) h += `<tr class="t" data-blk><td></td><td>Монтаж</td><td></td><td></td><td class="n">${r.wLabel}</td></tr>`;
+    h += `<tr class="t" data-blk><td></td><td>Разом</td><td></td><td></td><td class="n">${r.totalLabel}</td></tr></tbody></table>`;
   }
   h += `<div class="rp-sign" data-blk><div>Виконавець: ${esc(s.executor || "")}</div><div>Замовник</div></div></div>`;
   const wrap = document.createElement("div");

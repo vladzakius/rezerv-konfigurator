@@ -79,7 +79,9 @@ export const EXAMPLE = {
   meter: false,
   workUsd: 350,
   workUah: "",
+  workCur: "usd", // валюта, в якій введено суму монтажу; друге поле — еквівалент
   rate: 41.5,
+  rateDate: "",
   bought: {},
   executor: "Владислав Кацюба",
   phone: "",

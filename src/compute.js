@@ -72,18 +72,18 @@ export function compute(s, cat) {
   if (s.irelay) add("opt", "irelay", 1, "обмежує навантаження в режимі АКБ");
   if (s.meter) add("opt", "meter", 1);
 
-  // монтаж: сума в доларах (за курсом) + сума в гривнях
-  const usd = +s.workUsd || 0;
-  const uah = +s.workUah || 0;
+  // монтаж: рахуємо в тій валюті, в якій введено; гривневий еквівалент — для підсумку
   const rate = +s.rate || 0;
-  r.usd = usd;
+  const cur = s.workCur === "uah" ? "uah" : "usd";
+  const wAmt = cur === "usd" ? +s.workUsd || 0 : +s.workUah || 0;
   r.rate = rate;
-  const wSum = usd * rate + uah;
-  if (wSum > 0) {
-    const note = [usd ? `${fmt(usd)} $ × ${String(rate).replace(".", ",")}` : "", uah ? `${fmt(uah)} грн` : ""]
-      .filter(Boolean)
-      .join(" + ");
-    add("works", "work", 1, note, { name: "Монтажні роботи під ключ", model: "", price: wSum, unit: "компл", url: "" });
+  r.wCur = cur;
+  r.wAmt = wAmt;
+  r.wLabel = wAmt ? (cur === "usd" ? `${fmt(wAmt)} $` : `${fmt(wAmt)} грн`) : "";
+  if (wAmt > 0) {
+    const wUah = cur === "usd" ? wAmt * rate : wAmt;
+    const note = cur === "usd" ? `${fmt(wAmt)} $ за курсом ${String(rate).replace(".", ",")}` : "";
+    add("works", "work", 1, note, { name: "Монтажні роботи під ключ", model: "", price: wUah, unit: "компл", url: "" });
   }
 
   // підказки для монтажника
@@ -118,8 +118,13 @@ export function compute(s, cat) {
     else mat += it.sum;
   });
   Object.assign(r, { mat, works: wk, total: mat + wk, Pmax, chg, Ibat, lim: Math.min(P, Pmax), kwh: (+s.batKwh || 0) * nB });
+  // «Разом» для клієнта — саме у введеній валюті, без перерахунку доларів
+  r.totalLabel = r.wCur === "usd" && r.wAmt ? `${fmt(mat)} грн + ${fmt(r.wAmt)} $` : `${fmt(r.total)} грн`;
   return { items, notes, r };
 }
+
+/** Рядок монтажу для клієнта: ціна і сума — як введено */
+export const workPrice = (it, r) => (it.zone === "works" && r.wCur === "usd" ? `${fmt(r.wAmt)} $` : null);
 
 /** Зведений список покупок (без робіт), однакові позиції об'єднані */
 export function buyList(calc) {
@@ -158,10 +163,13 @@ export function clientText(s, calc, zones) {
     t += `${zones[z]}:\n`;
     rows.forEach((it) => {
       i++;
-      t += `${i}. ${it.c.name}${it.c.model ? " (" + it.c.model + ")" : ""} — ${it.qty} ${it.c.unit} × ${fmt(it.c.price)} = ${fmt(it.sum)} грн\n`;
+      const wp = workPrice(it, r);
+      t += wp
+        ? `${i}. ${it.c.name} — ${wp}\n`
+        : `${i}. ${it.c.name}${it.c.model ? " (" + it.c.model + ")" : ""} — ${it.qty} ${it.c.unit} × ${fmt(it.c.price)} = ${fmt(it.sum)} грн\n`;
     });
     t += "\n";
   });
-  t += `Матеріали: ${fmt(r.mat)} грн\nМонтаж: ${fmt(r.works)} грн${r.usd ? ` (${fmt(r.usd)} $)` : ""}\nРазом: ${fmt(r.total)} грн\n\nЦіни орієнтовні, без вартості інвертора та АКБ.`;
+  t += `Матеріали: ${fmt(r.mat)} грн\n${r.wLabel ? `Монтаж: ${r.wLabel}\n` : ""}Разом: ${r.totalLabel}\n\nЦіни орієнтовні, без вартості інвертора та АКБ.`;
   return t;
 }

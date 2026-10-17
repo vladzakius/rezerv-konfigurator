@@ -10,7 +10,7 @@ function F({ label, children }) {
   );
 }
 
-export default function Form({ s, set, calc, children }) {
+export default function Form({ s, set, setWork, setRate, onRateRefresh, rateBusy, rateStatus, calc, children }) {
   const v = (k, num) => ({
     value: s[k] ?? "",
     onChange: (e) => set(k, num ? (e.target.value === "" ? "" : +e.target.value) : e.target.value),
@@ -118,15 +118,25 @@ export default function Form({ s, set, calc, children }) {
         <fieldset>
           <legend>Вартість монтажу</legend>
           <div className="row">
-            <F label="Монтаж, $"><input type="number" min="0" step="10" placeholder="300–400" {...v("workUsd", true)} /></F>
-            <F label="Монтаж, грн"><input type="number" min="0" step="100" placeholder="0" {...v("workUah", true)} /></F>
+            <F label={`Монтаж, $${s.workCur === "uah" ? " · еквівалент" : ""}`}>
+              <input type="number" min="0" step="10" placeholder="300–400" className={s.workCur === "uah" ? "derived" : ""}
+                value={s.workUsd ?? ""} onChange={(e) => setWork("usd", e.target.value)} />
+            </F>
+            <F label={`Монтаж, грн${s.workCur === "usd" ? " · еквівалент" : ""}`}>
+              <input type="number" min="0" step="100" className={s.workCur === "usd" ? "derived" : ""}
+                value={s.workUah ?? ""} onChange={(e) => setWork("uah", e.target.value)} />
+            </F>
           </div>
-          <F label="Курс $, грн"><input type="number" min="0" step="0.01" {...v("rate", true)} /></F>
+          <div className="rate-row">
+            <F label="Курс $, грн"><input type="number" min="0" step="0.0001" value={s.rate ?? ""} onChange={(e) => setRate(e.target.value)} /></F>
+            <button type="button" onClick={onRateRefresh} disabled={rateBusy}>Курс НБУ</button>
+          </div>
+          <p className="status" style={{ margin: 0 }}>{rateStatus}</p>
           <div className="wk-sum">
-            <span>Монтаж разом</span>
-            <span>{fmt(r.works)} грн{r.usd ? ` · ${fmt(r.usd)} $` : ""}</span>
+            <span>Монтаж</span>
+            <span>{r.wLabel || "—"}{r.wCur === "usd" && r.wAmt ? ` ≈ ${fmt(r.works)} грн` : ""}</span>
           </div>
-          <p className="status" style={{ margin: 0 }}>Заповни одне поле або обидва — суми додаються.</p>
+          <p className="status" style={{ margin: 0 }}>Вводь в одному полі — друге покаже еквівалент. У звіт і текст для клієнта йде та валюта, яку ти ввів.</p>
         </fieldset>
 
         {children}

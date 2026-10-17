@@ -89,8 +89,14 @@ export function EstimatePanel({ calc }) {
       </div>
       <div className="totals">
         <div className="tot"><span>Матеріали</span><b>{fmt(r.mat)} грн</b></div>
-        <div className="tot"><span>Монтаж{r.usd ? ` · ${fmt(r.usd)} $` : ""}</span><b>{fmt(r.works)} грн</b></div>
-        <div className="tot main"><span>Разом</span><b>{fmt(r.total)} грн</b></div>
+        <div className="tot">
+          <span>Монтаж{r.wCur === "usd" && r.wAmt ? ` · ≈ ${fmt(r.works)} грн` : ""}</span>
+          <b>{r.wLabel || "0 грн"}</b>
+        </div>
+        <div className="tot main">
+          <span>Разом{r.wCur === "usd" && r.wAmt ? ` · ≈ ${fmt(r.total)} грн` : ""}</span>
+          <b>{r.totalLabel}</b>
+        </div>
       </div>
     </section>
   );

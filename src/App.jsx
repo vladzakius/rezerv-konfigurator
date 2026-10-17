@@ -11,7 +11,23 @@ import ReportCard from "./components/ReportCard.jsx";
 import Catalog from "./components/Catalog.jsx";
 import Projects from "./components/Projects.jsx";
 
-const normalize = (s) => ({ ...EXAMPLE, ...s, bought: s.bought || {} });
+const normalize = (s) => {
+  const n = { ...EXAMPLE, ...s, bought: s.bought || {} };
+  if (!s.workCur) n.workCur = +s.workUsd ? "usd" : +s.workUah ? "uah" : "usd";
+  return derive(n, {}, true);
+};
+
+/* Монтаж: поле у валюті workCur — введене, друге — еквівалент за курсом */
+function derive(p, patch, keepExample) {
+  const n = { ...p, ...patch };
+  if (!keepExample) n.example = false;
+  const rate = +n.rate || 0;
+  if (n.workCur === "usd") n.workUah = n.workUsd === "" || !rate ? "" : Math.round(+n.workUsd * rate);
+  else n.workUsd = n.workUah === "" || !rate ? "" : Math.round(+n.workUah / rate);
+  return n;
+}
+
+const NBU_URL = "https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=USD&json";
 
 export default function App() {
   const [state, setState] = useState(() => normalize(load("rz_state") || {}));
@@ -43,6 +59,32 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToastMsg(""), 2200);
   };
   const set = (k, v) => setState((p) => ({ ...p, [k]: v, example: false }));
+  const num = (v) => (v === "" ? "" : +v);
+  const setWork = (cur, v) => setState((p) => derive(p, cur === "usd" ? { workUsd: num(v), workCur: "usd" } : { workUah: num(v), workCur: "uah" }));
+  const setRate = (v) => setState((p) => derive(p, { rate: num(v), rateDate: "" }));
+
+  /* офіційний курс НБУ */
+  const [rateBusy, setRateBusy] = useState(false);
+  const [rateStatus, setRateStatus] = useState("");
+  const refreshRate = useCallback(async () => {
+    setRateBusy(true);
+    setRateStatus("Отримую курс НБУ…");
+    try {
+      const res = await fetch(NBU_URL);
+      const j = await res.json();
+      const x = Array.isArray(j) ? j[0] : null;
+      if (!x || !x.rate) throw new Error("rate");
+      const rate = Math.round(x.rate * 100) / 100;
+      setState((p) => derive(p, { rate, rateDate: x.exchangedate }, true));
+      setRateStatus(`Офіційний курс НБУ на ${x.exchangedate}: ${String(rate).replace(".", ",")} грн`);
+    } catch {
+      setRateStatus("Не вдалося отримати курс НБУ — введи курс вручну.");
+    }
+    setRateBusy(false);
+  }, []);
+  useEffect(() => {
+    refreshRate();
+  }, [refreshRate]);
 
   useEffect(() => save("rz_state", state), [state]);
   useEffect(() => save("rz_cat", catOver), [catOver]);
@@ -191,7 +233,7 @@ export default function App() {
       </header>
 
       <div className="grid">
-        <Form s={state} set={set} calc={calc}>
+        <Form s={state} set={set} setWork={setWork} setRate={setRate} onRateRefresh={refreshRate} rateBusy={rateBusy} rateStatus={rateStatus} calc={calc}>
           <Projects
             db={db}
             projects={projects}
