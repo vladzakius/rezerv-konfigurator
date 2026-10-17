@@ -1,6 +1,4 @@
 import { useEffect, useState } from "react";
-import { DEFAULT_CAT, EXAMPLE } from "../catalog.js";
-import { compute } from "../compute.js";
 import { fmt, load, save } from "../utils.js";
 
 const LOCAL_KEY = "rz_projects";
@@ -10,7 +8,7 @@ const makeId = () => {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
 };
 
-export default function Projects({ db, projects, onSave, onOpen, onDelete, onReset, status }) {
+export default function Projects({ db, projects, state, calc, onSave, onOpen, onDelete, onReset, status }) {
   const [armed, setArmed] = useState(null);
   const [localProjects, setLocalProjects] = useState(() => {
     const v = load(LOCAL_KEY);
@@ -27,16 +25,13 @@ export default function Projects({ db, projects, onSave, onOpen, onDelete, onRes
     : "Об'єкти зберігаються локально в цьому браузері. Фото до архіву не входять.";
 
   const saveLocal = () => {
-    const inputs = { ...EXAMPLE, ...(load("rz_state") || {}) };
+    const inputs = { ...state };
     delete inputs.example;
-    const catOver = load("rz_cat") || {};
-    const cat = (key) => ({ ...(DEFAULT_CAT[key] || { name: key, model: "", price: 0, unit: "шт", url: "" }), ...(catOver[key] || {}) });
-    const total = compute(inputs, cat).r.total;
     const item = {
       id: makeId(),
       name: inputs.client || `Об'єкт ${new Date().toLocaleDateString("uk-UA")}`,
       inputs,
-      total,
+      total: calc.r.total,
       createdAt: Date.now(),
     };
     setLocalProjects((p) => [item, ...p].slice(0, 50));
