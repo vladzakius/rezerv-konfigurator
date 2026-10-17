@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CAT, EXAMPLE, ZONES } from "./catalog.js";
 import { compute, clientText } from "./compute.js";
+import { validateConfig } from "./validation.js";
 import { buildSVG } from "./scheme.js";
 import { makePdf } from "./report.js";
 import { useRuntime, saveFile } from "./runtime.js";
@@ -51,6 +52,7 @@ export default function App() {
     [catOver]
   );
   const calc = useMemo(() => compute(state, cat), [state, cat]);
+  const validation = useMemo(() => validateConfig(state, calc), [state, calc]);
   const { svg, parts } = useMemo(() => buildSVG(state, calc, cat), [state, calc, cat]);
 
   const toast = (m) => {
@@ -91,9 +93,9 @@ export default function App() {
 
   /* статус сховища */
   useEffect(() => {
-    if (!available) setDbStatus("Збереження об'єктів доступне у перегляді на claude.ai. Ціни зберігаються в цьому браузері.");
+    if (!available) setDbStatus("");
     else if (!ready) setDbStatus("Підключаю збереження…");
-    else if (!db) setDbStatus("Сховище недоступне — ціни і чернетка лишаються в цьому браузері.");
+    else if (!db) setDbStatus("Хмарне сховище недоступне — використовується локальне збереження.");
     else setDbStatus("");
   }, [available, ready, db]);
 
@@ -185,7 +187,7 @@ export default function App() {
   };
 
   const saveProject = async () => {
-    if (!db) return toast("Збереження об'єктів недоступне в цьому перегляді");
+    if (!db) return toast("Хмарне збереження недоступне");
     const inputs = { ...state };
     delete inputs.example;
     try {
@@ -232,11 +234,26 @@ export default function App() {
         </div>
       </header>
 
+      <section className={`readiness ${validation.level}`} aria-live="polite">
+        <div className="readiness-head">
+          <strong>{validation.label}</strong>
+          <span>{validation.errors.length ? `${validation.errors.length} обов'язкових полів` : validation.warnings.length ? `${validation.warnings.length} зауважень` : "Критичних зауважень немає"}</span>
+        </div>
+        {(validation.errors.length > 0 || validation.warnings.length > 0) && (
+          <ul>
+            {validation.errors.map((x) => <li key={`e-${x}`}>{x}</li>)}
+            {validation.warnings.map((x) => <li key={`w-${x}`}>{x}</li>)}
+          </ul>
+        )}
+      </section>
+
       <div className="grid">
         <Form s={state} set={set} setWork={setWork} setRate={setRate} onRateRefresh={refreshRate} rateBusy={rateBusy} rateStatus={rateStatus} calc={calc}>
           <Projects
             db={db}
             projects={projects}
+            state={state}
+            calc={calc}
             status={dbStatus}
             onSave={saveProject}
             onOpen={openProject}
