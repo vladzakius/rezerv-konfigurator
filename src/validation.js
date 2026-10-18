@@ -15,6 +15,18 @@ export function validateConfig(s, calc) {
   if (!(num(s.trace) >= 1)) errors.push("Вкажи довжину траси.");
   if (!(num(s.groups) >= 1)) errors.push("Вкажи кількість груп у резерві.");
 
+  const gridPhases = num(s.gridPhases) === 3 ? 3 : 1;
+  const invPhases = num(s.invPhases) === 3 ? 3 : 1;
+  if (gridPhases === 1 && invPhases === 3) {
+    errors.push("3-фазний інвертор не можна вважати готовою конфігурацією від 1-фазної мережі без іншої топології.");
+  }
+  if (gridPhases === 3 && invPhases === 1) {
+    warnings.push(`3-ф мережа → 1-ф резерв (${s.backupPhase || "L1"}): баланс фаз і трифазні навантаження треба перевірити окремо.`);
+  }
+  if (invPhases === 3) {
+    warnings.push("Для 3-фазного інвертора схема, AC-захист і переріз траси не підтверджуються автоматично.");
+  }
+
   if (s.workCur === "usd" && num(s.workUsd) > 0 && !(num(s.rate) > 0)) {
     errors.push("Для монтажу в доларах потрібен курс гривні.");
   }
@@ -23,17 +35,17 @@ export function validateConfig(s, calc) {
     warnings.push("Потужність АКБ нижча за номінальну потужність інвертора — перевір обмеження конкретного обладнання.");
   }
 
-  if (num(s.trace) > 10) {
-    warnings.push("Траса від щита до інвертора понад 10 м — окремо перевір параметри кабелю, спосіб прокладання та вимоги виробника інвертора.");
-  }
+  const trace = num(s.trace);
+  if (trace > 15 && trace <= 30) warnings.push("Траса 16–30 м — перевір переріз, падіння напруги та спосіб прокладання.");
+  if (trace > 30 && trace <= 50) warnings.push("Траса 31–50 м — потрібен окремий розрахунок AC-траси перед закупівлею кабелю.");
+  if (trace > 50) warnings.push("Траса понад 50 м — проєктний переріз і захист мають бути підтверджені окремим розрахунком.");
+  if (s.routeMethod === "existing") warnings.push("Для існуючої труби/стояка перевір доступний простір і стан траси до закупівлі кабелю.");
 
   if (s.earth === "tnc") {
     warnings.push("Конфігурація TN-C потребує перевірки на місці перед фінальним рішенням.");
   }
 
-  if (s.example) {
-    warnings.push("Зараз показано приклад. Заміни демонстраційні дані параметрами реального об'єкта.");
-  }
+  if (s.example) warnings.push("Зараз показано приклад. Заміни демонстраційні дані параметрами реального об'єкта.");
 
   const level = errors.length ? "incomplete" : warnings.length ? "check" : "ready";
   const label = level === "incomplete" ? "Недостатньо даних" : level === "check" ? "Потрібна перевірка" : "Готово до звіту";
