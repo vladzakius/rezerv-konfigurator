@@ -21,8 +21,10 @@ export const DEFAULT_CAT = {
   box_small: { name: "Бокс накладний 2–4 мод.", model: "будь-який", price: 150, unit: "шт", url: "" },
   dc125: { name: "DC-автомат 2P 125A 600 В DC, 10 кА", model: "Tomzn TOB1Z-125 C125 2P", price: 1100, unit: "шт", url: "https://www.promelectronica.com.ua/product/avtomat-postijnogo-strumu-tomzn-tob1z-125-c125-dc-250v-1r-125a-10ka-oryginal/" },
   dc100: { name: "DC-автомат 2P 100A 600 В DC", model: "Tomzn TOB1Z-125 C100 2P", price: 1000, unit: "шт", url: "" },
+  dc_project: { name: "DC-захист АКБ", model: "визначити за паспортом системи", price: 0, unit: "компл", url: "" },
   lugs: { name: "Наконечники штирові 35 мм²", model: "під клеми DC-автомата", price: 30, unit: "шт", url: "" },
   batcab: { name: "Силовий кабель АКБ 35 мм², обтиснутий", model: "мідь гнучка, наконечники M8", price: 350, unit: "шт", url: "" },
+  batcab_project: { name: "Комплект DC-з'єднань АКБ", model: "визначити за системою виробника", price: 0, unit: "компл", url: "" },
   cab4: { name: "Кабель ВВГнг-LS 5×4", model: "", price: 220, unit: "м", url: "" },
   cab6: { name: "Кабель ВВГнг-LS 5×6", model: "Одескабель", price: 323, unit: "м", url: "https://vencon.ua/ua/products/odeskabel-vvgng-ls-5x6-mm-5kl-2113110" },
   cab10: { name: "Кабель ВВГнг-LS 5×10", model: "", price: 520, unit: "м", url: "" },
@@ -36,6 +38,10 @@ export const DEFAULT_CAT = {
   socket: { name: "Розетка з заземленням IP44", model: "накладна / внутрішня", price: 150, unit: "шт", url: "" },
   irelay: { name: "Реле обмеження струму", model: "на DIN-рейку", price: 900, unit: "шт", url: "" },
   meter: { name: "Wi-Fi лічильник / реле", model: "на DIN-рейку", price: 1100, unit: "шт", url: "" },
+  sw4p_project: { name: "Перемикач I-0-II 4P", model: "номінал за проєктом", price: 0, unit: "шт", url: "" },
+  rcd4p_project: { name: "ПЗВ 4P тип A", model: "номінал за проєктом", price: 0, unit: "шт", url: "" },
+  ac3p_protection: { name: "Захист 3-фазного інвертора", model: "за паспортом і проєктом", price: 0, unit: "компл", url: "" },
+  ac3p_cable: { name: "AC-кабель 3-фазної траси", model: "переріз за розрахунком", price: 0, unit: "м", url: "" },
 };
 
 export const ZONES = {
@@ -48,28 +54,36 @@ export const ZONES = {
 };
 
 export const TYPE_HINT = {
-  offgrid:
-    "Автономний (Growatt SPF, Must, Felicity): у мережу не віддає, мережу пропускає через своє байпас-реле. Клеми AC IN / AC OUT. Без реле напруги на вході — ризик.",
-  hybrid:
-    "Гібридний (Deye, Sofar, Solis): вміє віддавати енергію в мережу, має CT-датчик струму. Клеми GRID / LOAD. Продаж у мережу вимкнути, якщо немає «зеленого» тарифу.",
+  offgrid: "Автономний: мережу використовує як вхід/байпас. Точні режими та вимоги захисту залежать від моделі.",
+  hybrid: "Гібридний: може працювати паралельно з мережею. Режими експорту, CT та захисти звіряються з паспортом і умовами підключення.",
 };
 
 export const EXAMPLE = {
   client: "Приклад: квартира в старому будинку",
+  invCatalogId: "growatt-spf-6000-es-plus",
   invModel: "Growatt SPF 6000 ES Plus",
   invKw: "6",
   invType: "offgrid",
+  invPhases: "1",
+  invBatteryClass: "lv48",
+  batCatalogId: "dyness-dl5-0c",
   batModel: "Dyness DL5.0C",
   batN: 1,
   batI: 100,
+  batV: 51.2,
   batKwh: 5.12,
+  batVoltageClass: "lv48",
   batBreaker: false,
+  gridPhases: "1",
+  backupPhase: "L1",
   vvod: "32",
   earth: "tnc",
   relay: "have",
   newBox: false,
   layout: "far",
   trace: 8,
+  routeMethod: "duct",
+  reserveMode: "groups",
   groups: 3,
   groupA: "25",
   boiler: true,
@@ -79,7 +93,7 @@ export const EXAMPLE = {
   meter: false,
   workUsd: 350,
   workUah: "",
-  workCur: "usd", // валюта, в якій введено суму монтажу; друге поле — еквівалент
+  workCur: "usd",
   rate: 41.5,
   rateDate: "",
   bought: {},
