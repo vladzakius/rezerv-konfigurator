@@ -5,7 +5,7 @@ import { fmt } from "../utils.js";
 
 export function SchemePanel({ s, svg, parts, calc }) {
   const phased = +s.gridPhases === 3 || +s.invPhases === 3;
-  const view = phased ? buildPhaseOverview(s, calc) : { svg, parts, conceptual: false };
+  const view = phased ? buildPhaseOverview(s, calc || { r: {} }) : { svg, parts, conceptual: false };
   return (
     <section className="card">
       <h2>
