@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { TYPE_HINT } from "../catalog.js";
 import { fmt } from "../utils.js";
 
@@ -17,6 +18,24 @@ export default function Form({ s, set, setWork, setRate, onRateRefresh, rateBusy
   });
   const c = (k) => ({ checked: !!s[k], onChange: (e) => set(k, e.target.checked) });
   const r = calc.r;
+  const trace = Math.max(1, +s.trace || 1);
+  const autoLayout = trace <= 3 ? "near" : "far";
+
+  useEffect(() => {
+    if (s.layout !== autoLayout) set("layout", autoLayout);
+  }, [s.trace, s.layout]);
+
+  const setTrace = (raw) => {
+    const n = raw === "" ? "" : Math.max(1, Math.min(80, +raw || 1));
+    set("trace", n);
+    if (n !== "") set("layout", +n <= 3 ? "near" : "far");
+  };
+
+  const placement = trace <= 3
+    ? { cls: "near", title: "Поруч із щитом", text: "До 3 м — конфігуратор автоматично використовує компактний варіант розміщення." }
+    : trace <= 10
+      ? { cls: "far", title: "Рознесене розміщення", text: "Понад 3 м — конфігуратор автоматично додає окрему зону біля інвертора." }
+      : { cls: "check", title: "Довга траса — перевірити проєкт", text: "Понад 10 м варто окремо перевірити трасу та параметри кабелю перед монтажем." };
 
   return (
     <aside className="form" aria-label="Вхідні дані">
@@ -81,13 +100,29 @@ export default function Form({ s, set, setWork, setRate, onRateRefresh, rateBusy
 
         <fieldset>
           <legend>Розташування і траса</legend>
-          <F label="Щит і інвертор">
-            <select {...v("layout")}>
-              <option value="far">Рознесені (щиток біля інвертора)</option>
-              <option value="near">Поруч, до 3 м</option>
-            </select>
-          </F>
-          <F label="Довжина траси, м"><input type="number" min="1" max="80" step="1" {...v("trace", true)} /></F>
+          <div className="trace-head">
+            <F label="Відстань від щита до інвертора, м">
+              <input type="number" min="1" max="80" step="1" value={s.trace ?? ""} onChange={(e) => setTrace(e.target.value)} />
+            </F>
+            <div className={"placement-pill " + placement.cls}>{trace <= 3 ? "до 3 м" : trace <= 10 ? "3–10 м" : "10+ м"}</div>
+          </div>
+          <div className="trace-slider">
+            <input
+              type="range"
+              min="1"
+              max="30"
+              step="1"
+              value={Math.min(trace, 30)}
+              aria-label="Відстань від щита до інвертора"
+              onChange={(e) => setTrace(e.target.value)}
+            />
+            <div className="trace-marks"><span>1 м</span><span>3 м</span><span>10 м</span><span>30 м</span></div>
+          </div>
+          <div className={"placement-note " + placement.cls}>
+            <strong>{placement.title}</strong>
+            <span>{placement.text}</span>
+          </div>
+          {trace > 30 && <p className="status" style={{ margin: 0 }}>Для 31–80 м введи точне значення у полі вище — повзунок показує перші 30 м.</p>}
         </fieldset>
 
         <fieldset>
