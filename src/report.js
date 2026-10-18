@@ -113,8 +113,21 @@ function sliceCuts(sec) {
           }
       }
     }
-    cuts.push([start, cut]);
+    cuts.push([start, cut, false]);
     start = cut;
+  }
+
+  /* Якщо в кінці лишився тільки короткий хвіст (найчастіше підписи),
+     не створюємо заради нього окрему майже порожню сторінку. Об'єднуємо
+     з попередньою і дозволяємо цій сторінці трохи зменшитися. */
+  if (cuts.length > 1) {
+    const last = cuts[cuts.length - 1];
+    const prev = cuts[cuts.length - 2];
+    const lastH = last[1] - last[0];
+    const mergedH = last[1] - prev[0];
+    if (lastH <= 220 && mergedH <= CH * 1.16) {
+      cuts.splice(cuts.length - 2, 2, [prev[0], last[1], true]);
+    }
   }
   return cuts;
 }
@@ -165,12 +178,19 @@ export async function makePdf({ s, calc, cat, svg, parts, photos, zones, onStatu
     const pdf = new jsPDF({ unit: "pt", format: "a4", compress: true });
     const PW = pdf.internal.pageSize.getWidth();
     const PH = pdf.internal.pageSize.getHeight();
+    const contentH = (1123 - 40 - 60) * S;
     let idx = 0;
-    for (const [y0, y1] of cuts) {
+    for (const [y0, y1, fit] of cuts) {
       const pc = pageCanvas(S);
       const sy = Math.round(y0 * S);
       const sh = Math.min(cv.height - sy, Math.round((y1 - y0) * S));
-      if (sh > 0) pc.getContext("2d").drawImage(cv, 0, sy, cv.width, sh, 0, Math.round(40 * S), pc.width, sh);
+      if (sh > 0) {
+        const k = fit ? Math.min(1, contentH / sh) : 1;
+        const dw = Math.round(pc.width * k);
+        const dh = Math.round(sh * k);
+        const dx = Math.round((pc.width - dw) / 2);
+        pc.getContext("2d").drawImage(cv, 0, sy, cv.width, sh, dx, Math.round(40 * S), dw, dh);
+      }
       idx++;
       footer(pc, S, s.client, idx, N);
       if (idx > 1) pdf.addPage();
