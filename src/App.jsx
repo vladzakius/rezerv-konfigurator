@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CAT, EXAMPLE, ZONES } from "./catalog.js";
+import { DEFAULT_EQUIPMENT, normalizeEquipment } from "./equipment.js";
 import { compute, clientText } from "./compute.js";
 import { validateConfig } from "./validation.js";
 import { buildSVG } from "./scheme.js";
@@ -10,6 +11,7 @@ import Form from "./components/Form.jsx";
 import { SchemePanel, NotesPanel, EstimatePanel, ShoppingPanel } from "./components/Panels.jsx";
 import ReportCard from "./components/ReportCard.jsx";
 import Catalog from "./components/Catalog.jsx";
+import EquipmentCatalog from "./components/EquipmentCatalog.jsx";
 import Projects from "./components/Projects.jsx";
 
 const normalize = (s) => {
@@ -18,7 +20,6 @@ const normalize = (s) => {
   return derive(n, {}, true);
 };
 
-/* Монтаж: поле у валюті workCur — введене, друге — еквівалент за курсом */
 function derive(p, patch, keepExample) {
   const n = { ...p, ...patch };
   if (!keepExample) n.example = false;
@@ -33,6 +34,7 @@ const NBU_URL = "https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?va
 export default function App() {
   const [state, setState] = useState(() => normalize(load("rz_state") || {}));
   const [catOver, setCatOver] = useState(() => load("rz_cat") || {});
+  const [equipment, setEquipment] = useState(() => normalizeEquipment(load("rz_equipment")));
   const [photos, setPhotos] = useState([]);
   const [projects, setProjects] = useState([]);
   const [toastMsg, setToastMsg] = useState("");
@@ -61,11 +63,11 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToastMsg(""), 2200);
   };
   const set = (k, v) => setState((p) => ({ ...p, [k]: v, example: false }));
+  const setPatch = (patch) => setState((p) => ({ ...p, ...patch, example: false }));
   const num = (v) => (v === "" ? "" : +v);
   const setWork = (cur, v) => setState((p) => derive(p, cur === "usd" ? { workUsd: num(v), workCur: "usd" } : { workUah: num(v), workCur: "uah" }));
   const setRate = (v) => setState((p) => derive(p, { rate: num(v), rateDate: "" }));
 
-  /* офіційний курс НБУ */
   const [rateBusy, setRateBusy] = useState(false);
   const [rateStatus, setRateStatus] = useState("");
   const refreshRate = useCallback(async () => {
@@ -84,14 +86,12 @@ export default function App() {
     }
     setRateBusy(false);
   }, []);
-  useEffect(() => {
-    refreshRate();
-  }, [refreshRate]);
+  useEffect(() => { refreshRate(); }, [refreshRate]);
 
   useEffect(() => save("rz_state", state), [state]);
   useEffect(() => save("rz_cat", catOver), [catOver]);
+  useEffect(() => save("rz_equipment", equipment), [equipment]);
 
-  /* статус сховища */
   useEffect(() => {
     if (!available) setDbStatus("");
     else if (!ready) setDbStatus("Підключаю збереження…");
@@ -99,7 +99,6 @@ export default function App() {
     else setDbStatus("");
   }, [available, ready, db]);
 
-  /* довідник зі сховища + підписка на об'єкти */
   useEffect(() => {
     if (!db) return;
     let unsub = null;
@@ -126,12 +125,9 @@ export default function App() {
     } catch {
       setDbStatus("Список об'єктів недоступний.");
     }
-    return () => {
-      if (typeof unsub === "function") unsub();
-    };
+    return () => { if (typeof unsub === "function") unsub(); };
   }, [db]);
 
-  /* збереження довідника в сховище з затримкою */
   useEffect(() => {
     if (!catDirty.current) return;
     catDirty.current = false;
@@ -160,9 +156,12 @@ export default function App() {
     setCatOver({});
     toast("Повернуто заводські ціни");
   };
+  const resetEquipment = () => {
+    setEquipment(normalizeEquipment(DEFAULT_EQUIPMENT));
+    toast("Повернуто стартовий каталог обладнання");
+  };
 
   const copy = async (t) => toast((await copyText(t)) ? "Скопійовано — встав у месенджер" : "Не вдалося скопіювати");
-
   const downloadSvg = () => saveFile(dl, `Shema_${slug(state.client)}.svg`, new Blob([svg], { type: "image/svg+xml" }));
   const downloadCsv = () => {
     const q = (v) => '"' + String(v).replace(/"/g, '""') + '"';
@@ -210,15 +209,13 @@ export default function App() {
     }
   };
 
-  const toggleBuy = (k, on) =>
-    setState((p) => {
-      const b = { ...(p.bought || {}) };
-      if (on) b[k] = true;
-      else delete b[k];
-      return { ...p, bought: b };
-    });
-  const copyBuy = (L) =>
-    copy(`Список покупок — ${state.client || "об'єкт"}\n\n` + L.map((x) => `${state.bought[x.key] ? "✅" : "⬜"} ${x.c.name}${x.c.model ? " (" + x.c.model + ")" : ""} — ${x.qty} ${x.c.unit}`).join("\n"));
+  const toggleBuy = (k, on) => setState((p) => {
+    const b = { ...(p.bought || {}) };
+    if (on) b[k] = true;
+    else delete b[k];
+    return { ...p, bought: b };
+  });
+  const copyBuy = (L) => copy(`Список покупок — ${state.client || "об'єкт"}\n\n` + L.map((x) => `${state.bought[x.key] ? "✅" : "⬜"} ${x.c.name}${x.c.model ? " (" + x.c.model + ")" : ""} — ${x.qty} ${x.c.unit}`).join("\n"));
 
   return (
     <div className="wrap">
@@ -248,18 +245,8 @@ export default function App() {
       </section>
 
       <div className="grid">
-        <Form s={state} set={set} setWork={setWork} setRate={setRate} onRateRefresh={refreshRate} rateBusy={rateBusy} rateStatus={rateStatus} calc={calc}>
-          <Projects
-            db={db}
-            projects={projects}
-            state={state}
-            calc={calc}
-            status={dbStatus}
-            onSave={saveProject}
-            onOpen={openProject}
-            onDelete={deleteProject}
-            onReset={() => setState(normalize({}))}
-          />
+        <Form s={state} set={set} setPatch={setPatch} equipment={equipment} setWork={setWork} setRate={setRate} onRateRefresh={refreshRate} rateBusy={rateBusy} rateStatus={rateStatus} calc={calc}>
+          <Projects db={db} projects={projects} state={state} calc={calc} status={dbStatus} onSave={saveProject} onOpen={openProject} onDelete={deleteProject} onReset={() => setState(normalize({}))} />
         </Form>
 
         <main>
@@ -268,6 +255,7 @@ export default function App() {
           <EstimatePanel calc={calc} />
           <ShoppingPanel calc={calc} bought={state.bought} onToggle={toggleBuy} onReset={() => set("bought", {})} onCopy={copyBuy} />
           <ReportCard s={state} set={set} photos={photos} setPhotos={setPhotos} onPdf={makeReport} busy={pdfBusy} status={pdfStatus} setStatus={setPdfStatus} />
+          <EquipmentCatalog equipment={equipment} onChange={setEquipment} onReset={resetEquipment} />
           <Catalog cat={cat} onChange={changeCat} onReset={resetCat} status={catStatus} />
         </main>
       </div>
