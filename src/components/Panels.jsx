@@ -1,35 +1,34 @@
 import { ZONES } from "../catalog.js";
 import { buyList } from "../compute.js";
+import { buildPhaseOverview } from "../scheme3.js";
 import { fmt } from "../utils.js";
 
 export function SchemePanel({ s, svg, parts, calc }) {
-  const supported = calc?.r?.schemeSupported ?? (+s.invPhases !== 3);
+  const phased = +s.gridPhases === 3 || +s.invPhases === 3;
+  const view = phased ? buildPhaseOverview(s, calc) : { svg, parts, conceptual: false };
   return (
     <section className="card">
       <h2>
         {s.client || "Схема підключення"}
         {s.example && <span className="badge-ex">приклад</span>}
       </h2>
-      {!supported ? (
-        <div className="scheme-blocked">
-          <strong>3-фазна схема не генерується автоматично</strong>
-          <p>Щоб не показувати хибну 1-ф схему, для 3-ф інвертора конфігуратор залишає тільки структуру кошторису та перелік перевірок. Схему й номінали потрібно сформувати після окремого проєктного розрахунку.</p>
-        </div>
+      {view.conceptual ? (
+        <p className="hint">Концептуальна схема для клієнта: показує структуру системи та напрямок резерву, але не є монтажною схемою і не задає клеми, перемички чи остаточні номінали захисту.</p>
       ) : (
-        <>
-          <p className="hint">Апарати намальовані у стилі моделей з довідника. Номери — позиції у переліку під схемою.</p>
-          <div className="sheet" dangerouslySetInnerHTML={{ __html: svg }} />
-          <div className="legend">
-            <span><i style={{ background: "#d1302f" }} />L фаза</span>
-            <span><i style={{ background: "#1f6fd1" }} />N нуль</span>
-            <span><i style={{ background: "repeating-linear-gradient(90deg,#d8b21c 0 6px,#2f8f46 6px 12px)" }} />PE</span>
-            <span><i style={{ background: "#d1302f", height: 6 }} />DC +</span>
-            <span><i style={{ background: "#222", height: 6 }} />DC −</span>
-            <span><i style={{ background: "transparent", border: "1.5px dashed #8d98a3", height: 10 }} />кабель траси</span>
-          </div>
-          <ol className="parts">{parts.map((p, i) => <li key={i}>{p}</li>)}</ol>
-        </>
+        <p className="hint">Апарати намальовані у стилі моделей з довідника. Номери — позиції у переліку під схемою.</p>
       )}
+      <div className="sheet" dangerouslySetInnerHTML={{ __html: view.svg }} />
+      {!view.conceptual && (
+        <div className="legend">
+          <span><i style={{ background: "#d1302f" }} />L фаза</span>
+          <span><i style={{ background: "#1f6fd1" }} />N нуль</span>
+          <span><i style={{ background: "repeating-linear-gradient(90deg,#d8b21c 0 6px,#2f8f46 6px 12px)" }} />PE</span>
+          <span><i style={{ background: "#d1302f", height: 6 }} />DC +</span>
+          <span><i style={{ background: "#222", height: 6 }} />DC −</span>
+          <span><i style={{ background: "transparent", border: "1.5px dashed #8d98a3", height: 10 }} />кабель траси</span>
+        </div>
+      )}
+      <ol className="parts">{view.parts.map((p, i) => <li key={i}>{p}</li>)}</ol>
     </section>
   );
 }
