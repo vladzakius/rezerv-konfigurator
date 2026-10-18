@@ -11,9 +11,18 @@ export function validateConfig(s, calc) {
   if (!text(s.batModel)) errors.push("Вкажи модель АКБ.");
   if (!(num(s.batN) >= 1)) errors.push("Кількість АКБ має бути не менше 1.");
   if (!(num(s.batI) > 0)) errors.push("Вкажи допустимий струм розряду АКБ.");
+  if (!(num(s.batV) > 0)) errors.push("Вкажи номінальну напругу АКБ.");
   if (!(num(s.batKwh) > 0)) errors.push("Вкажи ємність АКБ.");
   if (!(num(s.trace) >= 1)) errors.push("Вкажи довжину траси.");
   if (!(num(s.groups) >= 1)) errors.push("Вкажи кількість груп у резерві.");
+
+  const invBatteryClass = s.invBatteryClass || "unknown";
+  const batVoltageClass = s.batVoltageClass || "unknown";
+  if (invBatteryClass !== "unknown" && batVoltageClass !== "unknown" && invBatteryClass !== batVoltageClass) {
+    errors.push("Клас напруги інвертора та АКБ не збігається.");
+  } else if (invBatteryClass === "unknown" || batVoltageClass === "unknown") {
+    warnings.push("Клас напруги інвертора або АКБ не вказаний — сумісність не перевірена.");
+  }
 
   const gridPhases = num(s.gridPhases) === 3 ? 3 : 1;
   const invPhases = num(s.invPhases) === 3 ? 3 : 1;
@@ -32,7 +41,7 @@ export function validateConfig(s, calc) {
   }
 
   if (calc?.r?.Pmax > 0 && num(s.invKw) > calc.r.Pmax) {
-    warnings.push("Потужність АКБ нижча за номінальну потужність інвертора — перевір обмеження конкретного обладнання.");
+    warnings.push("Оцінена віддача АКБ нижча за номінальну потужність інвертора — перевір паспортні ліміти конкретного обладнання.");
   }
 
   const trace = num(s.trace);
@@ -41,10 +50,7 @@ export function validateConfig(s, calc) {
   if (trace > 50) warnings.push("Траса понад 50 м — проєктний переріз і захист мають бути підтверджені окремим розрахунком.");
   if (s.routeMethod === "existing") warnings.push("Для існуючої труби/стояка перевір доступний простір і стан траси до закупівлі кабелю.");
 
-  if (s.earth === "tnc") {
-    warnings.push("Конфігурація TN-C потребує перевірки на місці перед фінальним рішенням.");
-  }
-
+  if (s.earth === "tnc") warnings.push("Конфігурація TN-C потребує перевірки на місці перед фінальним рішенням.");
   if (s.example) warnings.push("Зараз показано приклад. Заміни демонстраційні дані параметрами реального об'єкта.");
 
   const level = errors.length ? "incomplete" : warnings.length ? "check" : "ready";
