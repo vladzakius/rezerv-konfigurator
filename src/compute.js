@@ -13,7 +13,6 @@ function routeProfile(m) {
   return { key: "special", label: "100+ м", reserve: Math.ceil(trace * 0.12), review: true };
 }
 
-/** Розрахунок позицій кошторису, номіналів і підказок з вхідних даних */
 export function compute(s, cat) {
   const items = [];
   const notes = [];
@@ -24,6 +23,9 @@ export function compute(s, cat) {
   const P = +s.invKw || 0;
   const vv = +s.vvod || 32;
   const nB = Math.max(1, +s.batN || 1);
+  const batV = +s.batV || 51.2;
+  const invBatteryClass = s.invBatteryClass || "lv48";
+  const batVoltageClass = s.batVoltageClass || "lv48";
   const gridPhases = +s.gridPhases === 3 ? 3 : 1;
   const invPhases = +s.invPhases === 3 ? 3 : 1;
   const trace = Math.max(1, +s.trace || 1);
@@ -33,12 +35,11 @@ export function compute(s, cat) {
   const phaseScenario = `${gridPhases}to${invPhases}`;
   const nominalAcA = P > 0 ? (invPhases === 3 ? (P * 1000) / (Math.sqrt(3) * 400) : (P * 1000) / 230) : 0;
 
-  /* Автоматичний підбір 1-ф захисту збережено лише для 1-ф інвертора. Для 3-ф режиму — тільки проєктні placeholders. */
   const invCalc = invPhases === 1 ? stdUp(nominalAcA * 1.25) : 0;
   const invA = invPhases === 1 ? Math.max(16, Math.min(invCalc, vv)) : 0;
   const big = vv > 40;
   const r = {
-    invA, big, near, hyb, gridPhases, invPhases, phaseScenario, nominalAcA, route,
+    invA, big, near, hyb, gridPhases, invPhases, phaseScenario, nominalAcA, route, batV, invBatteryClass, batVoltageClass,
     schemeSupported: invPhases === 1,
     swA: big ? 63 : 40,
     rcdA: big ? 63 : 40,
@@ -77,11 +78,17 @@ export function compute(s, cat) {
     add("inv", "box_inv", 1, "розмір визначити після комплектації");
   }
 
+  const lvBattery = batVoltageClass === "lv48";
   if (!s.batBreaker) {
-    add("dc", r.k.dc, 1, "параметри DC-захисту звірити з паспортом АКБ та інвертора");
-    add("dc", "box_small", 1, "окремо від AC");
-    add("dc", "lugs", 4);
-    add("dc", "batcab", 2, "готові силові кабелі АКБ");
+    if (lvBattery) {
+      add("dc", r.k.dc, 1, "параметри DC-захисту звірити з паспортом АКБ та інвертора");
+      add("dc", "box_small", 1, "окремо від AC");
+      add("dc", "lugs", 4);
+      add("dc", "batcab", 2, "готові силові кабелі АКБ");
+    } else {
+      add("dc", "dc_project", 1, "DC-захист визначити за паспортом конкретної HV/невідомої системи");
+      add("dc", "batcab_project", 1, "кабелі/з'єднання визначити за системою виробника");
+    }
   }
 
   if (invPhases === 1) {
@@ -118,8 +125,11 @@ export function compute(s, cat) {
   }
 
   const Ibat = (+s.batI || 100) * nB;
-  const Pmax = (Ibat * 48 * 0.93) / 1000;
+  const Pmax = (Ibat * batV * 0.93) / 1000;
 
+  if (invBatteryClass !== "unknown" && batVoltageClass !== "unknown" && invBatteryClass !== batVoltageClass) {
+    notes.push({ t: "bad", m: "Клас напруги інвертора та АКБ не збігається. Не вважай цю пару сумісною без підтвердження виробника." });
+  }
   if (phaseScenario === "1to3") notes.push({ t: "bad", m: "1-фазна мережа та 3-фазний інвертор — несумісний базовий сценарій. Потрібна інша топологія або інше обладнання." });
   if (phaseScenario === "3to1") notes.push({ t: "warn", m: `3-ф мережа → 1-ф резерв: у конфігураторі обрана фаза ${s.backupPhase || "L1"}. Трифазні споживачі та баланс фаз потребують окремої перевірки проєкту.` });
   if (phaseScenario === "3to3") notes.push({ t: "warn", m: "3-ф резерв: схема та номінали захисту не підбираються автоматично. Конфігуратор формує кошторисні placeholders і перелік даних для перевірки проєкту." });
@@ -134,7 +144,7 @@ export function compute(s, cat) {
   r.chg = chg;
   if (route.review) notes.push({ t: "warn", m: `Траса ${trace} м (${route.label}): базовий переріз не вважається підтвердженим. Перевір падіння напруги, допустимий струм, спосіб прокладання та паспорт інвертора.` });
   if (trace > 50) notes.push({ t: "warn", m: "Дуже довга AC-траса: у кошторис додано 10% запасу кабелю. Проєктний переріз і захист мають бути підтверджені окремим розрахунком." });
-  if (s.routeMethod === "existing") notes.push({ t: "", m: "Траса в існуючій трубі/стояку: перевір фактичний стан, доступний внутрішній діаметр і можливість протяжки до закупівлі кабелю." });
+  if (s.routeMethod === "existing") notes.push({ t: "", m: "Траса в існуючій трубі/стояку: перевір фактичний стан, доступний простір і можливість протяжки до закупівлі кабелю." });
 
   if (s.earth === "tnc") notes.push({ t: "warn", m: "TN-C: стан системи заземлення та можливість підключення корпусів потрібно перевірити на місці кваліфікованим спеціалістом." });
   if (+s.groupA >= 25) notes.push({ t: "warn", m: `Групи C${s.groupA}: перевір відповідність номіналу фактичному кабелю кожної групи.` });
