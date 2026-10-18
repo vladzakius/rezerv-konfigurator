@@ -1,9 +1,6 @@
 import { esc, fmt, dec } from "./utils.js";
 import { worksDone, workPrice } from "./compute.js";
 
-/* PDF-фотозвіт: HTML-сторінки рендеряться поза екраном (html2canvas) і складаються в A4 (jsPDF).
-   Кирилиця йде через браузерні шрифти, тому вбудовувати шрифт у PDF не потрібно. */
-
 function svgToPng(svg, w, h) {
   return new Promise((res) => {
     const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
@@ -32,22 +29,26 @@ const waitImages = (el) =>
 function reportSection({ s, calc, cat, png, parts, zones }) {
   const r = calc.r;
   const d = s.rpDate ? new Date(s.rpDate + "T12:00:00").toLocaleDateString("uk-UA") : "";
+  const traceLabel = r.invPhases === 3 ? `${s.trace} м · ${r.route?.label || ""}` : `${cat(r.cab).name.replace("Кабель ", "")}, ${s.trace} м`;
   const kv = [
     ["Інвертор", `${s.invModel || "—"}, ${s.invKw} кВт`],
+    ["Система", `${r.gridPhases}ф мережа → ${r.invPhases}ф інвертор`],
     ["Тип", r.hyb ? "гібридний" : "автономний"],
     ["Батарея", `${s.batModel || "—"} × ${s.batN}`],
-    ["Ємність", `${dec(r.kwh, 2)} кВт·год`],
-    ["Макс. навантаження від АКБ", `${dec(r.lim)} кВт`],
+    ["АКБ", `${dec(r.kwh, 2)} кВт·год · ${dec(r.batV, 1)} В ном.`],
+    ["Оцінена віддача АКБ", `${dec(r.Pmax)} кВт`],
     ["Груп у резерві", `${s.groups}`],
-    ["Траса", `${cat(r.cab).name.replace("Кабель ", "")}, ${s.trace} м`],
-    ["Ввідний автомат", `C${s.vvod}`],
+    ["Траса", traceLabel],
   ];
   let h = `<div class="rp"><div class="rp-head" data-blk><div><div class="rp-kicker">Звіт про виконані роботи</div><h1>Система резервного живлення</h1><div>${esc(s.client || "")}</div></div>
     <div class="rp-meta">${esc(d)}<br>${s.executor ? "Виконавець: " + esc(s.executor) : ""}${s.phone ? "<br>" + esc(s.phone) : ""}</div></div>`;
   h += `<h2 data-blk>Встановлене обладнання</h2><div class="rp-kv" data-blk>${kv.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join("")}</div>`;
-  if (png)
+  if (png) {
     h += `<h2 data-blk>Схема підключення</h2><img class="rp-img" data-blk src="${png}" alt=""><div class="rp-leg" data-blk>L — червоний, N — синій, PE — жовто-зелений, DC: + червоний, − чорний. Пунктир — кабель траси.</div>
     <div class="rp-parts" data-blk>${parts.map((p, i) => `<div>${i + 1}. ${esc(p)}</div>`).join("")}</div>`;
+  } else if (!r.schemeSupported) {
+    h += `<h2 data-blk>Схема підключення</h2><div class="rp-leg" data-blk>Для 3-фазного інвертора автоматична 1-ф схема навмисно не додається. Схема та номінали AC-захисту мають бути підтверджені окремим проєктним розрахунком.</div>`;
+  }
   h += `<h2 data-blk>Виконані роботи</h2><ul>${worksDone(s, r).map((x) => `<li data-blk>${esc(x)}</li>`).join("")}</ul>`;
   if (s.rpPrices) {
     h += `<h2 data-blk>Кошторис</h2><table><thead><tr data-blk><th>№</th><th>Позиція</th><th class="n">К-сть</th><th class="n">Ціна, грн</th><th class="n">Сума, грн</th></tr></thead><tbody>`;
@@ -78,18 +79,15 @@ function photoPage(s, list, startIdx) {
   el.className = "rp-pg";
   el.innerHTML =
     `<div class="rp-pghead">Фотозвіт · ${esc(s.client || "")}</div>` +
-    list
-      .map((p, j) => {
-        const k = Math.min(698 / p.w, 420 / p.h);
-        const w = Math.round(p.w * k);
-        const h = Math.round(p.h * k);
-        return `<div class="rp-ph"><div class="rp-phbox"><img src="${p.src}" width="${w}" height="${h}" style="width:${w}px;height:${h}px" alt=""></div><div class="rp-cap">${startIdx + j + 1}. ${esc(p.cap || "Фото")}</div></div>`;
-      })
-      .join("");
+    list.map((p, j) => {
+      const k = Math.min(698 / p.w, 420 / p.h);
+      const w = Math.round(p.w * k);
+      const h = Math.round(p.h * k);
+      return `<div class="rp-ph"><div class="rp-phbox"><img src="${p.src}" width="${w}" height="${h}" style="width:${w}px;height:${h}px" alt=""></div><div class="rp-cap">${startIdx + j + 1}. ${esc(p.cap || "Фото")}</div></div>`;
+    }).join("");
   return el;
 }
 
-/* розрізає довгу секцію на сторінки, не розриваючи рядки таблиці, пункти й картинки */
 function sliceCuts(sec) {
   const top = sec.getBoundingClientRect().top;
   const H = sec.offsetHeight;
@@ -116,18 +114,12 @@ function sliceCuts(sec) {
     cuts.push([start, cut, false]);
     start = cut;
   }
-
-  /* Якщо в кінці лишився тільки короткий хвіст (найчастіше підписи),
-     не створюємо заради нього окрему майже порожню сторінку. Об'єднуємо
-     з попередньою і дозволяємо цій сторінці трохи зменшитися. */
   if (cuts.length > 1) {
     const last = cuts[cuts.length - 1];
     const prev = cuts[cuts.length - 2];
     const lastH = last[1] - last[0];
     const mergedH = last[1] - prev[0];
-    if (lastH <= 220 && mergedH <= CH * 1.16) {
-      cuts.splice(cuts.length - 2, 2, [prev[0], last[1], true]);
-    }
+    if (lastH <= 220 && mergedH <= CH * 1.16) cuts.splice(cuts.length - 2, 2, [prev[0], last[1], true]);
   }
   return cuts;
 }
@@ -163,7 +155,7 @@ export async function makePdf({ s, calc, cat, svg, parts, photos, zones, onStatu
   host.className = "rp-host";
   document.body.appendChild(host);
   try {
-    const png = await svgToPng(svg, 2400, 1320);
+    const png = calc.r.schemeSupported ? await svgToPng(svg, 2400, 1320) : null;
     const sec = reportSection({ s, calc, cat, png, parts, zones });
     host.appendChild(sec);
     await waitImages(host);
