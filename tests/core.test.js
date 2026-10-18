@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { DEFAULT_CAT, EXAMPLE } from "../src/catalog.js";
 import { compute } from "../src/compute.js";
 import { validateConfig } from "../src/validation.js";
+import { buildPhaseOverview } from "../src/scheme3.js";
 
 const cat = (key) => DEFAULT_CAT[key] || { name: key, model: "", price: 0, unit: "шт", url: "" };
 
@@ -63,7 +64,7 @@ test("80 m route adds material reserve and stays in review mode", () => {
   assert.ok(validation.warnings.some((x) => x.includes("понад 50 м")));
 });
 
-test("three-phase inverter uses project placeholders and suppresses auto scheme", () => {
+test("three-phase inverter uses project placeholders and suppresses detailed auto scheme", () => {
   const state = base({ gridPhases: "3", invPhases: "3", invKw: "12", trace: 20 });
   const result = compute(state, cat);
   assert.equal(result.r.schemeSupported, false);
@@ -87,4 +88,24 @@ test("battery voltage class mismatch is blocking", () => {
   assert.equal(validation.level, "incomplete");
   assert.ok(validation.errors.some((x) => x.includes("Клас напруги")));
   assert.ok(result.items.some((x) => x.key === "dc_project"));
+});
+
+test("3-to-1 client overview shows selected backup phase and conceptual warning", () => {
+  const state = base({ gridPhases: "3", invPhases: "1", backupPhase: "L2" });
+  const result = compute(state, cat);
+  const view = buildPhaseOverview(state, result);
+  assert.equal(view.conceptual, true);
+  assert.match(view.svg, /3-ф мережа → 1-ф резерв/);
+  assert.match(view.svg, /L2/);
+  assert.match(view.svg, /Концептуальна схема для клієнта/);
+});
+
+test("3-to-3 client overview contains project protection and reserve blocks", () => {
+  const state = base({ gridPhases: "3", invPhases: "3", invKw: "12" });
+  const result = compute(state, cat);
+  const view = buildPhaseOverview(state, result);
+  assert.equal(view.conceptual, true);
+  assert.match(view.svg, /3-ф мережа → 3-ф резерв/);
+  assert.match(view.svg, /Проєктний 4P захист/);
+  assert.match(view.svg, /3-ф резерв/);
 });

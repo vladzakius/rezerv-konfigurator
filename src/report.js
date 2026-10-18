@@ -1,5 +1,6 @@
 import { esc, fmt, dec } from "./utils.js";
 import { worksDone, workPrice } from "./compute.js";
+import { buildPhaseOverview } from "./scheme3.js";
 
 function svgToPng(svg, w, h) {
   return new Promise((res) => {
@@ -26,7 +27,7 @@ function svgToPng(svg, w, h) {
 const waitImages = (el) =>
   Promise.all([...el.querySelectorAll("img")].map((i) => (i.complete ? 0 : new Promise((r) => (i.onload = i.onerror = r)))));
 
-function reportSection({ s, calc, cat, png, parts, zones }) {
+function reportSection({ s, calc, cat, png, parts, zones, conceptual }) {
   const r = calc.r;
   const d = s.rpDate ? new Date(s.rpDate + "T12:00:00").toLocaleDateString("uk-UA") : "";
   const traceLabel = r.invPhases === 3 ? `${s.trace} м · ${r.route?.label || ""}` : `${cat(r.cab).name.replace("Кабель ", "")}, ${s.trace} м`;
@@ -44,10 +45,13 @@ function reportSection({ s, calc, cat, png, parts, zones }) {
     <div class="rp-meta">${esc(d)}<br>${s.executor ? "Виконавець: " + esc(s.executor) : ""}${s.phone ? "<br>" + esc(s.phone) : ""}</div></div>`;
   h += `<h2 data-blk>Встановлене обладнання</h2><div class="rp-kv" data-blk>${kv.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join("")}</div>`;
   if (png) {
-    h += `<h2 data-blk>Схема підключення</h2><img class="rp-img" data-blk src="${png}" alt=""><div class="rp-leg" data-blk>L — червоний, N — синій, PE — жовто-зелений, DC: + червоний, − чорний. Пунктир — кабель траси.</div>
-    <div class="rp-parts" data-blk>${parts.map((p, i) => `<div>${i + 1}. ${esc(p)}</div>`).join("")}</div>`;
-  } else if (!r.schemeSupported) {
-    h += `<h2 data-blk>Схема підключення</h2><div class="rp-leg" data-blk>Для 3-фазного інвертора автоматична 1-ф схема навмисно не додається. Схема та номінали AC-захисту мають бути підтверджені окремим проєктним розрахунком.</div>`;
+    h += `<h2 data-blk>Схема підключення</h2><img class="rp-img" data-blk src="${png}" alt="">`;
+    if (conceptual) {
+      h += `<div class="rp-leg" data-blk><b>Концептуальна схема для клієнта.</b> Показує структуру системи та напрямок резерву. Не є монтажною схемою; клеми, перемички, перерізи та остаточні номінали захисту підтверджуються за паспортом обладнання і проєктом.</div>`;
+    } else {
+      h += `<div class="rp-leg" data-blk>L — червоний, N — синій, PE — жовто-зелений, DC: + червоний, − чорний. Пунктир — кабель траси.</div>`;
+    }
+    h += `<div class="rp-parts" data-blk>${parts.map((p, i) => `<div>${i + 1}. ${esc(p)}</div>`).join("")}</div>`;
   }
   h += `<h2 data-blk>Виконані роботи</h2><ul>${worksDone(s, r).map((x) => `<li data-blk>${esc(x)}</li>`).join("")}</ul>`;
   if (s.rpPrices) {
@@ -155,8 +159,10 @@ export async function makePdf({ s, calc, cat, svg, parts, photos, zones, onStatu
   host.className = "rp-host";
   document.body.appendChild(host);
   try {
-    const png = calc.r.schemeSupported ? await svgToPng(svg, 2400, 1320) : null;
-    const sec = reportSection({ s, calc, cat, png, parts, zones });
+    const phased = +s.gridPhases === 3 || +s.invPhases === 3;
+    const view = phased ? buildPhaseOverview(s, calc) : { svg, parts, conceptual: false };
+    const png = await svgToPng(view.svg, 2400, 1320);
+    const sec = reportSection({ s, calc, cat, png, parts: view.parts, zones, conceptual: !!view.conceptual });
     host.appendChild(sec);
     await waitImages(host);
     const H = sec.offsetHeight;
