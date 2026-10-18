@@ -36,9 +36,17 @@ test("validation catches missing core equipment data", () => {
 });
 
 test("validation can reach ready state for complete neutral scenario", () => {
-  const state = base({ invKw: "3", batN: 2, batI: 100, batKwh: 5.12, workCur: "uah", workUah: 12000, workUsd: "" });
+  const state = base({ invKw: "3", batN: 2, batI: 100, batKwh: 5.12, trace: 8, workCur: "uah", workUah: 12000, workUsd: "" });
   const result = compute(state, cat);
   const validation = validateConfig(state, result);
   assert.equal(validation.errors.length, 0);
   assert.equal(validation.level, "ready");
+});
+
+test("long inverter route requires a project check", () => {
+  const state = base({ invKw: "3", batN: 2, batI: 100, batKwh: 5.12, trace: 18, workCur: "uah", workUah: 12000, workUsd: "" });
+  const result = compute(state, cat);
+  const validation = validateConfig(state, result);
+  assert.equal(validation.level, "check");
+  assert.ok(validation.warnings.some((x) => x.includes("понад 10 м")));
 });
