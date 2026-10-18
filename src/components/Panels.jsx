@@ -3,7 +3,7 @@ import { buyList } from "../compute.js";
 import { fmt } from "../utils.js";
 
 export function SchemePanel({ s, svg, parts, calc }) {
-  const supported = calc?.r?.schemeSupported !== false;
+  const supported = calc?.r?.schemeSupported ?? (+s.invPhases !== 3);
   return (
     <section className="card">
       <h2>
